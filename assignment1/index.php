@@ -11,10 +11,20 @@ $commission = 0.10; // 10% commission
 // Prepare query
 $result = $db
 	->prepare('
-		SELECT * FROM bookings
+		select distinct bookings.booker_id as bookerId,
+				bookingitems.end_timestamp as bookingDate,
+				(spaces.hour_price*(bookingitems.end_timestamp-bookingitems.start_timestamp)/3600) as price
+		from bookingitems
+		join items
+		on bookingitems.item_id=items.id
+		join bookings on bookingitems.booking_id=bookings.id
+		join spaces
+		on spaces.item_id=items.id
+		order by bookingitems.end_timestamp
 	')
-	->run()
-;
+	->run();
+
+
 ?>
 <!doctype html>
 <html>
@@ -53,15 +63,61 @@ $result = $db
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ($result as $index => $row): ?>
-					<tr>
-						<td>TODO</td>
-						<td>TODO</td>
-						<td>TODO</td>
-						<td>TODO</td>
-						<td>TODO</td>
-					</tr>
-				<?php endforeach; ?>
+				<?php
+				date_default_timezone_set('America/Los_Angeles');
+				$monthLTVReport = [];
+				$checkedBookers = [];
+				$bookingsLog = [];
+
+				function getMonthLTV($bookersList){
+					global $bookingsLog;
+					$count=0;
+					$totalSum=0;
+					foreach ($bookingsLog as  $index=>$row):
+						if (!in_array($row->bookerId, $bookersList)) continue;
+						$totalSum +=  $row->price;
+						$count++;
+					endforeach;
+					return [
+						'turnoverAvg' => $totalSum / $count,
+						'bookingsAvg' => $count / count($bookersList)
+					];
+				}
+
+				foreach ($result as $index => $row):
+					$bookingsLog[] = $row;
+					$year = date('Y', $row->bookingDate);
+					$month = date('m', $row->bookingDate);
+					if (in_array($row->bookerId, $checkedBookers)) continue;
+					$checkedBookers[] = $row->bookerId;
+					if (array_key_exists($year, $monthLTVReport)) {
+						if (array_key_exists($month, $monthLTVReport[$year])) {
+							$monthLTVReport[$year][$month][] = $row->bookerId;
+						} else {
+							$monthLTVReport[$year][$month] = [$row->bookerId];
+						}
+					} else {
+						$monthLTVReport[$year] = [];
+						$monthLTVReport[$year][$month] = [$row->bookerId];
+					}
+					?>
+
+				<?php endforeach;
+				foreach ($monthLTVReport as $yearNumber => $months) :
+					foreach ($months as $monthNumber => $bookers):
+						$oneMonthLTV = getMonthLTV($bookers);
+					?>
+						<tr>
+							<td><?= $monthNumber ?>&nbsp;<?= $yearNumber ?></td>
+							<td><?= count($bookers) ?></td>
+							<td><?= $oneMonthLTV['bookingsAvg'] ?></td>
+							<td><?= $oneMonthLTV['turnoverAvg'] ?></td>
+							<td><?= $oneMonthLTV['turnoverAvg']*$commission ?></td>
+						</tr>
+					<?php
+					endforeach;
+				endforeach;
+				?>
 			</tbody>
 			<tfoot>
 				<tr>
