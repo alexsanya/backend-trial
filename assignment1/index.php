@@ -66,17 +66,18 @@ $result = $db
 				<?php
 				date_default_timezone_set('America/Los_Angeles');
 				$monthLTVReport = [];
-				$checkedBookers = [];
+				$numberOfBookings = [];
+				$priceOfBookings = [];
 				$bookingsLog = [];
 
 				function getMonthLTV($bookersList){
-					global $bookingsLog;
+					global $numberOfBookings;
+					global $priceOfBookings;
 					$count=0;
 					$totalSum=0;
-					foreach ($bookingsLog as  $index=>$row):
-						if (!in_array($row->bookerId, $bookersList)) continue;
-						$totalSum +=  $row->price;
-						$count++;
+					foreach ($bookersList as  $bookerId):
+						$totalSum += $priceOfBookings[$bookerId];
+						$count += $numberOfBookings[$bookerId];
 					endforeach;
 					return [
 						'turnoverAvg' => $totalSum / $count,
@@ -88,8 +89,13 @@ $result = $db
 					$bookingsLog[] = $row;
 					$year = date('Y', $row->bookingDate);
 					$month = date('m', $row->bookingDate);
-					if (in_array($row->bookerId, $checkedBookers)) continue;
-					$checkedBookers[] = $row->bookerId;
+					if (array_key_exists($row->bookerId, $numberOfBookings)) {
+						$numberOfBookings[$row->bookerId]++;
+						$priceOfBookings[$row->bookerId]+=$row->price;
+						continue;
+					};
+					$numberOfBookings[$row->bookerId] = 1;
+					$priceOfBookings[$row->bookerId]=$row->price;
 					if (array_key_exists($year, $monthLTVReport)) {
 						if (array_key_exists($month, $monthLTVReport[$year])) {
 							$monthLTVReport[$year][$month][] = $row->bookerId;
