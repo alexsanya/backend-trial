@@ -68,6 +68,7 @@ $result = $db
 				$monthLTVReport = [];
 				$numberOfBookings = [];
 				$priceOfBookings = [];
+				$firstBooking = [];
 				$bookingsLog = [];
 
 				function getMonthLTV($bookersList){
@@ -90,12 +91,19 @@ $result = $db
 					$year = date('Y', $row->bookingDate);
 					$month = date('m', $row->bookingDate);
 					if (array_key_exists($row->bookerId, $numberOfBookings)) {
-						$numberOfBookings[$row->bookerId]++;
-						$priceOfBookings[$row->bookerId]+=$row->price;
+						$bookingDateTime = new DateTime();
+						$bookingDateTime->setTimestamp($row->bookingDate);
+						$firstBookingDateTime = new DateTime();
+						$firstBookingDateTime->setTimestamp($firstBooking[$row->bookerId]);
+						if (date_diff($bookingDateTime, $firstBookingDateTime)->m <= $period ) {
+							$numberOfBookings[$row->bookerId]++;
+							$priceOfBookings[$row->bookerId] += $row->price;
+						}
 						continue;
 					};
 					$numberOfBookings[$row->bookerId] = 1;
 					$priceOfBookings[$row->bookerId]=$row->price;
+					$firstBooking[$row->bookerId]=$row->bookingDate;
 					if (array_key_exists($year, $monthLTVReport)) {
 						if (array_key_exists($month, $monthLTVReport[$year])) {
 							$monthLTVReport[$year][$month][] = $row->bookerId;
@@ -111,14 +119,14 @@ $result = $db
 				<?php endforeach;
 				foreach ($monthLTVReport as $yearNumber => $months) :
 					foreach ($months as $monthNumber => $bookers):
-						$oneMonthLTV = getMonthLTV($bookers);
+						$singleMonthLTV = getMonthLTV($bookers);
 					?>
 						<tr>
 							<td><?= $monthNumber ?>&nbsp;<?= $yearNumber ?></td>
 							<td><?= count($bookers) ?></td>
-							<td><?= $oneMonthLTV['bookingsAvg'] ?></td>
-							<td><?= $oneMonthLTV['turnoverAvg'] ?></td>
-							<td><?= $oneMonthLTV['turnoverAvg']*$commission ?></td>
+							<td><?= $singleMonthLTV['bookingsAvg'] ?></td>
+							<td><?= $singleMonthLTV['turnoverAvg'] ?></td>
+							<td><?= $singleMonthLTV['turnoverAvg']*$commission ?></td>
 						</tr>
 					<?php
 					endforeach;
